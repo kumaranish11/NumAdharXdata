@@ -11,8 +11,8 @@ con = duckdb.connect()
 con.execute("INSTALL httpfs")
 con.execute("LOAD httpfs")
 
-# ✅ CORRECT URL for your Storage Bucket
-BASE_URL = "https://huggingface.co/buckets/Guptarajan845459/icrm-hitek-full-db-mixed-bucket/resolve/main"
+# ✅ CORRECT URL for Storage Bucket (no /main/)
+BASE_URL = "https://huggingface.co/buckets/Guptarajan845459/icrm-hitek-full-db-mixed-bucket/resolve"
 
 # Helper: clean NaN/Inf for JSON compliance
 def clean_nan(obj):
@@ -39,11 +39,7 @@ def root():
 
 @app.get("/FetchData")
 def fetch_by_phone(Number: str = Query(..., min_length=10, max_length=15, regex=r"^\d+$")):
-    """
-    Look up a phone number using the pre‑sorted phone index from your bucket.
-    """
     try:
-        # Build list of 7 phone shards
         shards = [f"{BASE_URL}/idx_phone.{i}.parquet" for i in range(7)]
         shards_str = ', '.join([f"'{url}'" for url in shards])
         query = f"""
@@ -68,9 +64,6 @@ def fetch_by_phone(Number: str = Query(..., min_length=10, max_length=15, regex=
 
 @app.get("/FetchAadhar")
 def fetch_by_aadhar(Aadhar: str = Query(..., min_length=12, max_length=12, regex=r"^\d+$")):
-    """
-    Look up an Aadhar number using the pre‑sorted Aadhar index from your bucket.
-    """
     try:
         shards = [f"{BASE_URL}/idx_aadhar.{i}.parquet" for i in range(7)]
         shards_str = ', '.join([f"'{url}'" for url in shards])

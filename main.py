@@ -6,24 +6,27 @@ import os
 
 app = FastAPI(title="NumAdharXdata Gateway", version="1.0")
 
-# --- Corrected Connection Logic ---
+# Initialize DuckDB and load httpfs
 con = duckdb.connect()
 con.execute("INSTALL httpfs")
 con.execute("LOAD httpfs")
 
+# Set the Hugging Face token from environment
 HF_TOKEN = os.environ.get("HF_TOKEN")
 if HF_TOKEN:
-    # Create a secret for Hugging Face authentication
-    con.execute(f"CREATE SECRET hf_token (TYPE HUGGINGFACE, TOKEN '{HF_TOKEN}')")
-    print("Hugging Face secret created successfully.")
+    # This tells DuckDB to send the Authorization header with every request
+    con.execute(f"SET http_headers = 'Authorization: Bearer {HF_TOKEN}'")
+    print("HTTP headers set with Hugging Face token.")
 else:
-    print("WARNING: HF_TOKEN environment variable not set.")
+    print("WARNING: HF_TOKEN not set; requests may fail with 403.")
 
-# ✅ Use the hf:// protocol with the correct bucket path
-BASE_URL = "hf://buckets/Guptarajan845459/icrm-hitek-full-db-mixed-bucket"
-# --- End of Corrected Connection Logic ---
+# Optional: also set a friendly User-Agent (though not strictly required)
+con.execute("SET custom_user_agent = 'Mozilla/5.0 (compatible; DuckDB/1.0)'")
 
-# Helper: clean NaN/Inf for JSON compliance
+# Base URL for your Storage Bucket (no /main/ in path)
+BASE_URL = "https://huggingface.co/buckets/Guptarajan845459/icrm-hitek-full-db-mixed-bucket/resolve"
+
+# Helper: clean NaN/Inf for JSON
 def clean_nan(obj):
     if isinstance(obj, float) and (math.isnan(obj) or math.isinf(obj)):
         return None
@@ -38,7 +41,7 @@ def clean_nan(obj):
 def root():
     return {
         "status": "online",
-        "message": "NumAdharXdata Gateway (Storage Bucket - hf://)",
+        "message": "NumAdharXdata Gateway (Storage Bucket with Auth)",
         "endpoints": [
             "/FetchData?Number=phone",
             "/FetchAadhar?Aadhar=aadhar"

@@ -6,35 +6,26 @@ import os
 
 app = FastAPI(title="NumAdharXdata Gateway", version="1.0")
 
-# --- Corrected Authentication using Secrets Manager ---
-# 1. Connect to DuckDB
+# --- Authentication using DuckDB Secrets Manager ---
 con = duckdb.connect()
 
-# 2. Install and load the httpfs extension
+# 1. Install and load the httpfs extension
 con.execute("INSTALL httpfs")
 con.execute("LOAD httpfs")
 
-# 3. Get the Hugging Face token from environment variables
+# 2. Get the Hugging Face token from environment variables
 HF_TOKEN = os.environ.get("HF_TOKEN")
 if not HF_TOKEN:
     print("WARNING: HF_TOKEN environment variable not set.")
 
-# 4. Create an HTTP secret with the Authorization header
-# This is the correct way to set custom headers in DuckDB
+# 3. Create the secret using BEARER_TOKEN (the most reliable method)
+# This tells DuckDB to automatically add the Authorization header to all HTTP requests
 con.execute(f"""
     CREATE SECRET http_auth (
         TYPE http,
-        EXTRA_HTTP_HEADERS MAP {{
-            'Authorization': 'Bearer {HF_TOKEN}'
-        }}
+        BEARER_TOKEN '{HF_TOKEN}'
     )
 """)
-
-# Optional: Set a custom User-Agent (this is now allowed after connection)
-try:
-    con.execute("SET custom_user_agent = 'Mozilla/5.0 (compatible; DuckDB/1.0)'")
-except Exception as e:
-    print(f"Note: Could not set custom_user_agent: {e}")
 
 # Base URL for your Storage Bucket
 BASE_URL = "https://huggingface.co/buckets/Guptarajan845459/icrm-hitek-full-db-mixed-bucket/resolve"

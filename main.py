@@ -4,7 +4,7 @@ import duckdb
 import math
 import os
 
-app = FastAPI(title="ICRM-HiTek Gateway", version="1.0")
+app = FastAPI(title="NumAdharXdata Gateway", version="1.0")
 
 # DuckDB with httpfs
 con = duckdb.connect()
@@ -14,14 +14,10 @@ con.execute("LOAD httpfs")
 # Base URL of the dataset on Hugging Face
 BASE_URL = "https://huggingface.co/datasets/Kzr0xx/icrm-hitek-full-db-mixed/resolve/main"
 
-# List of phone index shards (0..6)
-PHONE_SHARDS = [f"{BASE_URL}/idx_phone.{i}.parquet" for i in range(7)]
-AADHAR_SHARDS = [f"{BASE_URL}/idx_aadhar.{i}.parquet" for i in range(7)]
-
 # The raw data (for full‑text search fallback)
 RAW_URL = "https://huggingface.co/datasets/Kzr0xx/Icmr-and-hitek/resolve/main/data.parquet"
 
-# Helper: clean NaN/Inf for JSON
+# Helper: clean NaN/Inf for JSON compliance
 def clean_nan(obj):
     if isinstance(obj, float) and (math.isnan(obj) or math.isinf(obj)):
         return None
@@ -36,7 +32,7 @@ def clean_nan(obj):
 def root():
     return {
         "status": "online",
-        "message": "ICRM-HiTek Data Gateway",
+        "message": "NumAdharXdata Gateway",
         "endpoints": [
             "/FetchData?Number=phone",
             "/FetchAadhar?Aadhar=aadhar",
@@ -52,21 +48,12 @@ def fetch_by_phone(Number: str = Query(..., min_length=10, max_length=15, regex=
     Returns all matching records.
     """
     try:
-        # Read all phone shards (glob) and filter
-        # We need to pass a list of filenames to read_parquet
+        # Build explicit list of all 7 phone index shards
+        phone_shards = [f"{BASE_URL}/idx_phone.{i}.parquet" for i in range(7)]
+        # DuckDB can read a list of files; we convert it to a string literal
+        shards_str = ', '.join([f"'{url}'" for url in phone_shards])
         query = f"""
-            SELECT * FROM read_parquet({PHONE_SHARDS}) 
-            WHERE phoneNumber = '{Number}'
-        """
-        # DuckDB can accept a list of strings as the first argument to read_parquet
-        # But we need to format it properly: we'll build a list of filenames in the query.
-        # However, DuckDB's read_parquet does not accept a list directly in SQL string.
-        # We'll use the `read_parquet` with `union` or use the glob pattern:
-        # Using glob: 'https://.../idx_phone.*.parquet' works.
-        # Let's use glob for simplicity:
-        glob_url = f"{BASE_URL}/idx_phone.*.parquet"
-        query = f"""
-            SELECT * FROM read_parquet('{glob_url}') 
+            SELECT * FROM read_parquet([{shards_str}]) 
             WHERE phoneNumber = '{Number}'
         """
         result = con.execute(query)
@@ -91,9 +78,11 @@ def fetch_by_aadhar(Aadhar: str = Query(..., min_length=12, max_length=12, regex
     Look up an Aadhar number using the pre‑sorted Aadhar index.
     """
     try:
-        glob_url = f"{BASE_URL}/idx_aadhar.*.parquet"
+        # Build explicit list of all 7 Aadhar index shards
+        aadhar_shards = [f"{BASE_URL}/idx_aadhar.{i}.parquet" for i in range(7)]
+        shards_str = ', '.join([f"'{url}'" for url in aadhar_shards])
         query = f"""
-            SELECT * FROM read_parquet('{glob_url}') 
+            SELECT * FROM read_parquet([{shards_str}]) 
             WHERE aadharNumber = '{Aadhar}'
         """
         result = con.execute(query)

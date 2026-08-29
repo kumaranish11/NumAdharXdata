@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Query, Request
+from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
 import duckdb
 import math
@@ -11,8 +11,8 @@ con = duckdb.connect()
 con.execute("INSTALL httpfs")
 con.execute("LOAD httpfs")
 
-# Your new public bucket URL
-BASE_URL = "https://huggingface.co/datasets/Guptarajan845459/icrm-hitek-full-db-mixed-bucket/resolve/main"
+# ✅ CORRECT URL for your Storage Bucket
+BASE_URL = "https://huggingface.co/buckets/Guptarajan845459/icrm-hitek-full-db-mixed-bucket/resolve/main"
 
 # Helper: clean NaN/Inf for JSON compliance
 def clean_nan(obj):
@@ -29,7 +29,7 @@ def clean_nan(obj):
 def root():
     return {
         "status": "online",
-        "message": "NumAdharXdata Gateway (Your Bucket)",
+        "message": "NumAdharXdata Gateway (Storage Bucket)",
         "endpoints": [
             "/FetchData?Number=phone",
             "/FetchAadhar?Aadhar=aadhar"

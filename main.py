@@ -6,24 +6,24 @@ import os
 
 app = FastAPI(title="NumAdharXdata Gateway", version="1.0")
 
-# Initialize DuckDB and load httpfs
-con = duckdb.connect()
+# --- Correct: set headers and user-agent at connection time ---
+HF_TOKEN = os.environ.get("HF_TOKEN")
+if not HF_TOKEN:
+    print("WARNING: HF_TOKEN not set. Requests may fail with 403.")
+
+# Build connection config
+config = {
+    "custom_user_agent": "Mozilla/5.0 (compatible; DuckDB/1.0)",
+}
+if HF_TOKEN:
+    config["http_headers"] = f"Authorization: Bearer {HF_TOKEN}"
+
+# Connect with these settings
+con = duckdb.connect(config=config)
 con.execute("INSTALL httpfs")
 con.execute("LOAD httpfs")
 
-# Set the Hugging Face token from environment
-HF_TOKEN = os.environ.get("HF_TOKEN")
-if HF_TOKEN:
-    # This tells DuckDB to send the Authorization header with every request
-    con.execute(f"SET http_headers = 'Authorization: Bearer {HF_TOKEN}'")
-    print("HTTP headers set with Hugging Face token.")
-else:
-    print("WARNING: HF_TOKEN not set; requests may fail with 403.")
-
-# Optional: also set a friendly User-Agent (though not strictly required)
-con.execute("SET custom_user_agent = 'Mozilla/5.0 (compatible; DuckDB/1.0)'")
-
-# Base URL for your Storage Bucket (no /main/ in path)
+# Base URL for your Storage Bucket (no /main/)
 BASE_URL = "https://huggingface.co/buckets/Guptarajan845459/icrm-hitek-full-db-mixed-bucket/resolve"
 
 # Helper: clean NaN/Inf for JSON

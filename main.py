@@ -6,13 +6,24 @@ import os
 
 app = FastAPI(title="NumAdharXdata Gateway", version="1.0")
 
-# Connect with custom_user_agent set at connection time
-con = duckdb.connect(config={'custom_user_agent': 'Mozilla/5.0 (compatible; DuckDB/1.0)'})
+# --- Updated Connection Logic ---
+# 1. Connect and load extensions
+con = duckdb.connect()
 con.execute("INSTALL httpfs")
 con.execute("LOAD httpfs")
 
-# Your bucket URL (no /main/)
-BASE_URL = "https://huggingface.co/buckets/Guptarajan845459/icrm-hitek-full-db-mixed-bucket/resolve"
+# 2. Retrieve your Hugging Face token from environment variables
+HF_TOKEN = os.environ.get("HF_TOKEN")
+if not HF_TOKEN:
+    print("WARNING: HF_TOKEN environment variable not set.")
+else:
+    # 3. Create a secret for Hugging Face authentication
+    con.execute(f"CREATE SECRET hf_token (TYPE HUGGINGFACE, TOKEN '{HF_TOKEN}')")
+    print("Hugging Face secret created successfully.")
+# --- End of Updated Connection Logic ---
+
+# Your bucket URL using the hf:// protocol (without /resolve/main/)
+BASE_URL = "hf://datasets/Guptarajan845459/icrm-hitek-full-db-mixed-bucket"
 
 # Helper: clean NaN/Inf for JSON compliance
 def clean_nan(obj):
@@ -29,7 +40,7 @@ def clean_nan(obj):
 def root():
     return {
         "status": "online",
-        "message": "NumAdharXdata Gateway (Storage Bucket)",
+        "message": "NumAdharXdata Gateway (Using hf:// protocol)",
         "endpoints": [
             "/FetchData?Number=phone",
             "/FetchAadhar?Aadhar=aadhar"
@@ -40,6 +51,7 @@ def root():
 @app.get("/FetchData")
 def fetch_by_phone(Number: str = Query(..., min_length=10, max_length=15, regex=r"^\d+$")):
     try:
+        # Use hf:// paths directly
         shards = [f"{BASE_URL}/idx_phone.{i}.parquet" for i in range(7)]
         shards_str = ', '.join([f"'{url}'" for url in shards])
         query = f"""

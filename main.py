@@ -11,11 +11,18 @@ con = duckdb.connect()
 con.execute("INSTALL httpfs")
 con.execute("LOAD httpfs")
 
-# Base URL of the dataset on Hugging Face
-BASE_URL = "https://huggingface.co/datasets/Kzr0xx/icrm-hitek-full-db-mixed/resolve/main"
+# Set Hugging Face token from environment variable
+# MUST be set on Render: HF_TOKEN=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
+HF_TOKEN = os.environ.get("HF_TOKEN")
+if not HF_TOKEN:
+    print("WARNING: HF_TOKEN environment variable not set. Private datasets will fail.")
 
-# The raw data (for full‑text search fallback)
-RAW_URL = "https://huggingface.co/datasets/Kzr0xx/Icmr-and-hitek/resolve/main/data.parquet"
+# Use hf:// protocol for authenticated access
+# Base path for the private dataset
+DATASET_PATH = "hf://datasets/Kzr0xx/icrm-hitek-full-db-mixed"
+
+# The raw data (if needed) - this might also be private, but we'll define it
+RAW_URL = f"{DATASET_PATH}/data.parquet"
 
 # Helper: clean NaN/Inf for JSON compliance
 def clean_nan(obj):
@@ -32,7 +39,7 @@ def clean_nan(obj):
 def root():
     return {
         "status": "online",
-        "message": "NumAdharXdata Gateway",
+        "message": "NumAdharXdata Gateway (Private Dataset)",
         "endpoints": [
             "/FetchData?Number=phone",
             "/FetchAadhar?Aadhar=aadhar",
@@ -44,14 +51,12 @@ def root():
 @app.get("/FetchData")
 def fetch_by_phone(Number: str = Query(..., min_length=10, max_length=15, regex=r"^\d+$")):
     """
-    Look up a phone number using the pre‑sorted phone index.
-    Returns all matching records.
+    Look up a phone number using the pre‑sorted phone index (private dataset).
     """
     try:
-        # Build explicit list of all 7 phone index shards
-        phone_shards = [f"{BASE_URL}/idx_phone.{i}.parquet" for i in range(7)]
-        # DuckDB can read a list of files; we convert it to a string literal
-        shards_str = ', '.join([f"'{url}'" for url in phone_shards])
+        # List all 7 phone index shards explicitly
+        shards = [f"{DATASET_PATH}/idx_phone.{i}.parquet" for i in range(7)]
+        shards_str = ', '.join([f"'{url}'" for url in shards])
         query = f"""
             SELECT * FROM read_parquet([{shards_str}]) 
             WHERE phoneNumber = '{Number}'
@@ -75,12 +80,12 @@ def fetch_by_phone(Number: str = Query(..., min_length=10, max_length=15, regex=
 @app.get("/FetchAadhar")
 def fetch_by_aadhar(Aadhar: str = Query(..., min_length=12, max_length=12, regex=r"^\d+$")):
     """
-    Look up an Aadhar number using the pre‑sorted Aadhar index.
+    Look up an Aadhar number using the pre‑sorted Aadhar index (private dataset).
     """
     try:
-        # Build explicit list of all 7 Aadhar index shards
-        aadhar_shards = [f"{BASE_URL}/idx_aadhar.{i}.parquet" for i in range(7)]
-        shards_str = ', '.join([f"'{url}'" for url in aadhar_shards])
+        # List all 7 Aadhar index shards explicitly
+        shards = [f"{DATASET_PATH}/idx_aadhar.{i}.parquet" for i in range(7)]
+        shards_str = ', '.join([f"'{url}'" for url in shards])
         query = f"""
             SELECT * FROM read_parquet([{shards_str}]) 
             WHERE aadharNumber = '{Aadhar}'
@@ -109,10 +114,10 @@ def search(
 ):
     """
     Generic text search across the raw data (slower, but flexible).
-    Use the 'field' parameter to specify which column to match.
+    This uses the raw Parquet file (may be large and also private).
     """
     try:
-        # We search the raw data (not indexed) – this is slower
+        # Search the raw data file (if it exists in the dataset)
         query = f"""
             SELECT * FROM read_parquet('{RAW_URL}') 
             WHERE LOWER(CAST({field} AS VARCHAR)) LIKE LOWER('%{q}%')

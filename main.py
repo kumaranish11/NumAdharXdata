@@ -6,15 +6,12 @@ import os
 
 app = FastAPI(title="NumAdharXdata Gateway", version="1.0")
 
-# DuckDB with httpfs and custom User-Agent
-con = duckdb.connect()
+# Connect with custom_user_agent set at connection time
+con = duckdb.connect(config={'custom_user_agent': 'Mozilla/5.0 (compatible; DuckDB/1.0)'})
 con.execute("INSTALL httpfs")
 con.execute("LOAD httpfs")
 
-# FIX: Set a custom User-Agent to avoid 403 errors from Hugging Face
-con.execute("SET custom_user_agent = 'Mozilla/5.0 (compatible; DuckDB/1.0)'")
-
-# Your bucket URL
+# Your bucket URL (no /main/)
 BASE_URL = "https://huggingface.co/buckets/Guptarajan845459/icrm-hitek-full-db-mixed-bucket/resolve"
 
 # Helper: clean NaN/Inf for JSON compliance
